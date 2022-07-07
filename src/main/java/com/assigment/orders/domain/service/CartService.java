@@ -1,9 +1,11 @@
 package com.assigment.orders.domain.service;
 
 import com.assigment.orders.application.request.Cart;
+import com.assigment.orders.application.request.ChangeStatusDTO;
 import com.assigment.orders.application.request.CreateOrderDTO;
 import com.assigment.orders.application.response.CartUUIDDTO;
 import com.assigment.orders.domain.models.CartStatus;
+import com.assigment.orders.domain.models.OrderStatus;
 import com.assigment.orders.domain.repository.OrdersRepository;
 import com.assigment.orders.domain.models.Order;
 import lombok.AllArgsConstructor;
@@ -15,10 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -37,6 +36,22 @@ public class CartService {
         }
     }
 
+    public ResponseEntity<?> changeStatus(String orderUUID, ChangeStatusDTO status) {
+        Optional<Order> order = ordersRepository.findByOrderUUID(orderUUID);
+        if(order.isPresent()){
+            order.get().setStatus(status.getStatus());
+            ordersRepository.save(order.get());
+            return new ResponseEntity<>(order, HttpStatus.OK);
+        }else{
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    public ResponseEntity<?> getOrders() {
+        List<Order> orders = ordersRepository.findAll();
+        return new ResponseEntity<>(orders, HttpStatus.OK);
+    }
+
     public ResponseEntity<?> createOrder(CreateOrderDTO order, String userUUID) {
         RestTemplate restTemplate = new RestTemplate();
         String cartResourceUrl = "http://localhost:8457/v1/carts/";
@@ -47,7 +62,7 @@ public class CartService {
             headers.set("X-auth-user-id", userUUID);
             Object object = restTemplate.postForObject(cartResourceUrl+"close", new HttpEntity<>(new CartUUIDDTO(b.getCartUUID()), headers), Object.class);
             if(object != null){
-                Order o = new Order(UUID.randomUUID().toString(), b.getCartUUID(), b.getUserUUID());
+                Order o = new Order(UUID.randomUUID().toString(), b.getCartUUID(), b.getUserUUID(), OrderStatus.NEW, new Date());
                 ordersRepository.save(o);
                 return new ResponseEntity<>(o, HttpStatus.OK);
             }
@@ -55,28 +70,4 @@ public class CartService {
         }
         return new ResponseEntity<>(HttpStatus.FORBIDDEN);
     }
-
-//    public ResponseEntity<?> removeFromCart(String book, String userUUID) {
-//        Optional<Order> cart = ordersRepository.findByUserUUID(userUUID);
-//        RestTemplate restTemplate = new RestTemplate();
-//        String bookResourceUrl = "http://localhost:8989/v1/books/";
-//        Book b = restTemplate.getForObject(bookResourceUrl + book, Book.class);
-//
-//        if(cart.isPresent()){
-//            int newCount = cart.get().getBooksUUID().get(book)-1;
-//            if(newCount==0){
-//                cart.get().getBooksUUID().remove(book);
-//            }else{
-//                cart.get().getBooksUUID().put(book, newCount);
-//            }
-//
-//            assert b != null;
-//            cart.get().setPrice(cart.get().getPrice()-b.getPrice());
-//
-//            ordersRepository.save(cart.get());
-//            return new ResponseEntity<>(cart, HttpStatus.OK);
-//        }else{
-//            return  new ResponseEntity<>(HttpStatus.SEE_OTHER);
-//        }
-//    }
 }
